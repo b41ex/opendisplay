@@ -104,7 +104,7 @@ targets:
   OpenSidecarMacReceiver:
     type: application
     platform: macOS
-    deploymentTarget: "12.0"
+    deploymentTarget: "10.15.7"
     sources:
       - MacReceiver
       - Shared
@@ -132,6 +132,9 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.peetzweg.opensidecar.mac.receiver
+        # Apple silicon starts at Big Sur; keep Catalina for the Intel slice.
+        # https://developer.apple.com/documentation/xcode/adding-a-build-configuration-file-to-your-project
+        "MACOSX_DEPLOYMENT_TARGET[arch=arm64]": "11.0"
         PRODUCT_NAME: OpenDisplay Receiver
         BUNDLE_DISPLAY_NAME: OpenDisplay Receiver
         # Log.swift's file locking helpers live in the C bridging header.

@@ -53,6 +53,7 @@ app="$PWD/build/receiver/Build/Products/$CONFIGURATION/$product.app"
 test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")" = "$bundle_id"
 printf 'bundle_id=%s\nminimum_os=%s\n' "$bundle_id" \
   "$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$app/Contents/Info.plist")" >> "$evidence/manifest.txt"
+test "$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$app/Contents/Info.plist")" = 10.15.7
 test "$(lipo -archs "$app/Contents/MacOS/$product")" = x86_64
 # Record every embedded Mach-O (Sparkle helpers and Swift runtime included).
 while IFS= read -r -d '' binary; do

@@ -4,7 +4,7 @@
 // Mac. The pipeline is the shared StreamReceiver core; this file is only the
 // AppKit shell around it: lifecycle, the video window, cursor drawing, and
 // keeping the machine awake while it serves as a screen. It ships as its own
-// app (OpenSidecarMacReceiver target, macOS 12+) so old Macs can be displays.
+// app (OpenSidecarMacReceiver target, macOS 10.15.7+) so old Macs can be displays.
 //
 // Display-only for now: the receiving Mac's keyboard/trackpad are not
 // forwarded to the sender (KVM-style input is a follow-up).
@@ -198,7 +198,14 @@ final class ReceiverController: ObservableObject {
     private func announcePanel(to receiver: StreamReceiver) {
         guard let screen = NSScreen.screens.first else { return }
         let legacyScale = max(screen.backingScaleFactor, 2)
-        let inset = screen.safeAreaInsets.top
+        let inset: CGFloat
+        if #available(macOS 12, *) {
+            inset = screen.safeAreaInsets.top
+        } else {
+            // Catalina has no notch safe-area API; preserve the whole panel.
+            // https://developer.apple.com/documentation/appkit/nsscreen/safeareainsets
+            inset = 0
+        }
         let height = screen.frame.height - inset
         let displayID = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")]
             as? CGDirectDisplayID

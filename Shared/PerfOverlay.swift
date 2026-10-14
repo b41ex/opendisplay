@@ -21,29 +21,28 @@ struct PerfOverlay: View {
                     .font(.system(size: 12, weight: .bold, design: .monospaced))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
-                    .background(stats.transport == "USB" || stats.transport == "Cable"
+                    .background(Capsule().fill(stats.transport == "USB" || stats.transport == "Cable"
                                     ? Color.green.opacity(0.35)
                                 : stats.transport == "WiFi" ? Color.blue.opacity(0.4)
-                                : Color.gray.opacity(0.3),
-                                in: Capsule())
-                    .foregroundStyle(.white)
+                                : Color.gray.opacity(0.3)))
+                    .foregroundColor(.white)
                 if !stats.codec.isEmpty {
                     Text(stats.codec)
                         .font(.system(size: 12, weight: .bold, design: .monospaced))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
-                        .background(Color.white.opacity(0.15), in: Capsule())
-                        .foregroundStyle(.white)
+                        .background(Capsule().fill(Color.white.opacity(0.15)))
+                        .foregroundColor(.white)
                 }
                 // Frame rate is the number people know; lead with it.
                 VStack(spacing: 1) {
                     Text("\(stats.fps)")
                         .font(.system(size: 22, weight: .bold, design: .monospaced))
-                        .foregroundStyle(stats.fps >= 50 ? Color.green
+                        .foregroundColor(stats.fps >= 50 ? Color.green
                                          : stats.fps >= 28 ? Color.yellow : Color.orange)
                     Text("FPS")
                         .font(.system(size: 8, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundColor(.white.opacity(0.6))
                 }
                 metric("hitches", "\(stats.hitches)")
 
@@ -100,7 +99,7 @@ struct PerfOverlay: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 9)
-        .background(.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 12))
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color.black.opacity(0.55)))
         .padding(.horizontal, 8)
     }
 
@@ -118,10 +117,10 @@ struct PerfOverlay: View {
         VStack(spacing: 1) {
             Text(value)
                 .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                .foregroundStyle(.white)
+                .foregroundColor(.white)
             Text(label)
                 .font(.system(size: 8, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundColor(.white.opacity(0.5))
         }
     }
 
@@ -130,7 +129,7 @@ struct PerfOverlay: View {
             content.frame(width: 220, height: 38)
             Text(label)
                 .font(.system(size: 8, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundColor(.white.opacity(0.5))
         }
     }
 }
@@ -205,24 +204,35 @@ struct BarGraph: View {
     let reference: Double?
 
     var body: some View {
-        Canvas { context, size in
-            guard !samples.isEmpty else { return }
-            let barWidth = size.width / CGFloat(max(samples.count, 1))
-            for (i, ms) in samples.enumerated() {
-                let h = min(ms / ceiling, 1.0) * size.height
-                let rect = CGRect(x: CGFloat(i) * barWidth,
-                                  y: size.height - h,
-                                  width: max(barWidth - 0.5, 0.5),
-                                  height: h)
-                let color: Color = ms <= good ? .green : ms <= warn ? .yellow : .red
-                context.fill(Path(rect), with: .color(color.opacity(0.85)))
+        // Path/GeometryReader retain the same thresholds and reference line
+        // without Canvas (macOS 12). Three paths keep the view tree small.
+        // https://developer.apple.com/documentation/swiftui/path
+        GeometryReader { geometry in
+            ZStack {
+                bars(in: geometry.size, band: 0).fill(Color.green.opacity(0.85))
+                bars(in: geometry.size, band: 1).fill(Color.yellow.opacity(0.85))
+                bars(in: geometry.size, band: 2).fill(Color.red.opacity(0.85))
+                if !samples.isEmpty, let reference {
+                    Path { path in
+                        let y = geometry.size.height - CGFloat(reference / ceiling) * geometry.size.height
+                        path.move(to: CGPoint(x: 0, y: y))
+                        path.addLine(to: CGPoint(x: geometry.size.width, y: y))
+                    }
+                    .stroke(Color.white.opacity(0.35), lineWidth: 0.5)
+                }
             }
-            if let reference {
-                let y = size.height - (reference / ceiling) * size.height
-                context.stroke(Path { p in
-                    p.move(to: CGPoint(x: 0, y: y))
-                    p.addLine(to: CGPoint(x: size.width, y: y))
-                }, with: .color(.white.opacity(0.35)), lineWidth: 0.5)
+        }
+    }
+
+    private func bars(in size: CGSize, band: Int) -> Path {
+        Path { path in
+            let barWidth = size.width / CGFloat(max(samples.count, 1))
+            for (index, ms) in samples.enumerated() {
+                let sampleBand = ms <= good ? 0 : ms <= warn ? 1 : 2
+                guard sampleBand == band else { continue }
+                let height = CGFloat(min(ms / ceiling, 1)) * size.height
+                path.addRect(CGRect(x: CGFloat(index) * barWidth, y: size.height - height,
+                                    width: max(barWidth - 0.5, 0.5), height: height))
             }
         }
     }

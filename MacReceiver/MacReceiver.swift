@@ -66,8 +66,7 @@ final class ReceiverController: ObservableObject {
                                           VideoCapability(codec: "hevc", maxWidth: $0.width,
                                                           maxHeight: $0.height, maxFrameRate: 60)
                                       })
-        let saved = UserDefaults.standard.string(forKey: "receiverName")
-        receiver.serviceName = (saved?.isEmpty == false) ? saved! : fallbackName
+        receiver.serviceName = ReceiverPreferences.shared.serviceName
         announcePanel(to: receiver)
         receiver.powerActions = PowerControl.supported
         receiver.onPowerAction = { [weak self] action in self?.perform(action) }
@@ -173,7 +172,7 @@ final class ReceiverController: ObservableObject {
     /// Re-published name from the panel's text field. Empty falls back to the
     /// computer name (mirrors the iOS Settings behavior).
     func setAdvertisedName(_ name: String) {
-        UserDefaults.standard.set(name, forKey: "receiverName")
+        ReceiverPreferences.shared.receiverName = name
         receiver?.setServiceName(name)
     }
 

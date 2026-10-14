@@ -1,5 +1,6 @@
 import SwiftUI
 import Sparkle
+import Combine
 
 /// "Check for Updates…" button wired to Sparkle. Follows Sparkle 2's
 /// documented SwiftUI pattern: a small view model publishes the updater's
@@ -8,10 +9,15 @@ import Sparkle
 /// the receiver app.
 final class CheckForUpdatesViewModel: ObservableObject {
     @Published var canCheckForUpdates = false
+    private var subscription: AnyCancellable?
 
     init(updater: SPUUpdater) {
-        updater.publisher(for: \.canCheckForUpdates)
-            .assign(to: &$canCheckForUpdates)
+        // Sparkle's KVO property still drives the button on Catalina; the
+        // Published assign overload needs macOS 11, while sink supports 10.15.
+        // https://developer.apple.com/documentation/combine/publisher/sink(receivevalue:)
+        subscription = updater.publisher(for: \.canCheckForUpdates)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.canCheckForUpdates = $0 }
     }
 }
 

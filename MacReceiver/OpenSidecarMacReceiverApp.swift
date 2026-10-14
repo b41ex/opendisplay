@@ -147,7 +147,7 @@ struct ReceiverContentView: View {
                     .frame(width: 44, height: 44)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("OpenDisplay Receiver")
-                        .font(.title3.bold())
+                        .font(.system(size: 15, weight: .bold))
                     Text("This Mac as an extra display for another Mac")
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -175,7 +175,7 @@ struct ReceiverContentView: View {
                 Spacer()
                 Button("Logs") { Log.revealInFinder() }
                     .controlSize(.small)
-                    .help("Reveal the OpenDisplay Receiver log files in Finder")
+                    .receiverHelp("Reveal the OpenDisplay Receiver log files in Finder")
                 if let updater {
                     CheckForUpdatesView(updater: updater)
                 }
@@ -190,6 +190,16 @@ struct ReceiverContentView: View {
 }
 
 extension View {
+    /// Preserve tooltips before SwiftUI.help became available on macOS 11.
+    @ViewBuilder
+    func receiverHelp(_ text: String) -> some View {
+        if #available(macOS 11, *) {
+            help(text)
+        } else {
+            background(ReceiverTooltip(text: text))
+        }
+    }
+
     /// `.formStyle(.grouped)` where it exists (macOS 13); the default form on
     /// macOS 12 is the same content in the older flat layout.
     @ViewBuilder
@@ -199,5 +209,18 @@ extension View {
         } else {
             self
         }
+    }
+}
+
+/// AppKit tooltip backing view; it must not intercept button clicks.
+/// https://developer.apple.com/documentation/appkit/nsview/tooltip
+private struct ReceiverTooltip: NSViewRepresentable {
+    let text: String
+
+    func makeNSView(context: Context) -> NSView { TooltipView() }
+    func updateNSView(_ view: NSView, context: Context) { view.toolTip = text }
+
+    private final class TooltipView: NSView {
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
     }
 }

@@ -6,7 +6,7 @@ import SwiftUI
 /// name, and how-to copy. Lives inside the shared grouped Form.
 struct ReceiverSections: View {
     @ObservedObject var controller: ReceiverController
-    @AppStorage("showAnalytics") private var showAnalytics = false
+    @ObservedObject private var preferences = ReceiverPreferences.shared
 
     var body: some View {
         // The receiver exists only while receiver mode is on; observed in a
@@ -15,27 +15,24 @@ struct ReceiverSections: View {
             ReceiverStatusSection(receiver: receiver, controller: controller)
         }
 
-        Section {
-            ReceiverNameField { controller.setAdvertisedName($0) }
-        } header: {
-            Text("Name")
-        } footer: {
-            Text("How this Mac appears in the other Mac's Devices list.")
+        // The header/footer overload is available in SwiftUI 1 (Catalina).
+        // https://developer.apple.com/documentation/swiftui/section/init(header:footer:content:)
+        Section(header: Text("Name"),
+                footer: Text("How this Mac appears in the other Mac's Devices list.")) {
+            ReceiverNameField(preferences: preferences) { controller.setAdvertisedName($0) }
         }
 
-        Section {
-            Toggle("Performance overlay", isOn: $showAnalytics)
-        } footer: {
-            Text("FPS, bitrate, frame timing, and latency graphs at the bottom of the video window while streaming — the same HUD the iPhone app has.")
+        Section(footer: Text("FPS, bitrate, frame timing, and latency graphs at the bottom of the video window while streaming — the same HUD the iPhone app has.")) {
+            Toggle("Performance overlay", isOn: $preferences.showAnalytics)
         }
 
-        Section("How to connect") {
-            Label("Install and open OpenDisplay on the Mac whose screen you want to extend.",
-                  systemImage: "macbook.and.macbook")
-            Label("With both Macs on the same network, this Mac appears in its Devices list — click Connect there.",
-                  systemImage: "wifi")
-            Label("The stream opens in a window here — use the green traffic light for full screen.",
-                  systemImage: "arrow.up.left.and.arrow.down.right")
+        Section(header: Text("How to connect")) {
+            ReceiverLabel("Install and open OpenDisplay on the Mac whose screen you want to extend.",
+                          systemImage: "macbook.and.macbook")
+            ReceiverLabel("With both Macs on the same network, this Mac appears in its Devices list — click Connect there.",
+                          systemImage: "wifi")
+            ReceiverLabel("The stream opens in a window here — use the green traffic light for full screen.",
+                          systemImage: "arrow.up.left.and.arrow.down.right")
         }
         .font(.subheadline)
     }
@@ -48,7 +45,7 @@ private struct ReceiverStatusSection: View {
     let controller: ReceiverController
 
     var body: some View {
-        Section("This Mac as a display") {
+        Section(header: Text("This Mac as a display")) {
             HStack(alignment: .firstTextBaseline) {
                 Circle()
                     .fill(receiver.connected ? Color.green : Color.orange)
@@ -60,13 +57,13 @@ private struct ReceiverStatusSection: View {
                     Text(receiver.connected || receiver.status != "Ready to connect"
                          ? receiver.status : "Listening on port 9000")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundColor(.secondary)
                 }
                 Spacer()
                 if controller.streaming {
                     Button("Show Window") { controller.showWindow() }
                         .controlSize(.small)
-                        .help("Bring the video window back if you closed it — the stream keeps running either way.")
+                        .receiverHelp("Bring the video window back if you closed it — the stream keeps running either way.")
                 }
             }
             if receiver.videoSize != .zero {
@@ -79,9 +76,9 @@ private struct ReceiverStatusSection: View {
                 }
             }
             if let message = peerMessage {
-                Label(message, systemImage: "exclamationmark.triangle")
+                ReceiverLabel(message, systemImage: "exclamationmark.triangle")
                     .font(.caption)
-                    .foregroundStyle(.orange)
+                    .foregroundColor(.orange)
             }
         }
     }
@@ -101,12 +98,34 @@ private struct ReceiverStatusSection: View {
 /// object so streaming updates can't rebuild it mid-edit (same reasoning as
 /// the iOS DeviceNameField).
 private struct ReceiverNameField: View {
-    @AppStorage("receiverName") private var name = Host.current().localizedName ?? "Mac"
+    @ObservedObject var preferences: ReceiverPreferences
     let onChange: (String) -> Void
 
     var body: some View {
-        TextField("Name", text: $name)
-            // The single-value onChange: the two-value form is macOS 14.
-            .onChange(of: name, perform: onChange)
+        // Binding setters work on Catalina and announce each edit immediately.
+        // https://developer.apple.com/documentation/swiftui/binding/init(get:set:)
+        TextField("Name", text: Binding(get: { preferences.receiverName }, set: onChange))
+    }
+}
+
+/// SF Symbols and Label start on macOS 11; keep the full instruction on 10.15.
+private struct ReceiverLabel: View {
+    let text: String
+    let systemImage: String
+
+    init(_ text: String, systemImage: String) {
+        self.text = text
+        self.systemImage = systemImage
+    }
+
+    var body: some View {
+        if #available(macOS 11, *) {
+            Label(text, systemImage: systemImage)
+        } else {
+            HStack(alignment: .firstTextBaseline) {
+                Text("•").accessibility(hidden: true)
+                Text(text)
+            }
+        }
     }
 }

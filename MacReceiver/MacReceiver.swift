@@ -533,10 +533,10 @@ private let blankCursor: NSCursor = {
 /// same "showAnalytics" default the iOS app uses (toggled in the panel).
 struct ReceiverPerfOverlay: View {
     @ObservedObject var receiver: StreamReceiver
-    @AppStorage("showAnalytics") private var showAnalytics = false
+    @ObservedObject private var preferences = ReceiverPreferences.shared
 
     var body: some View {
-        if showAnalytics {
+        if preferences.showAnalytics {
             VStack {
                 Spacer()
                 PerfOverlay(stats: receiver.perf, videoSize: receiver.videoSize)

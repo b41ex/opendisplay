@@ -137,19 +137,66 @@ struct PerfOverlay: View {
 /// Left-aligned wrapping row: children flow onto as many rows as the
 /// proposed width requires. Keeps the perf overlay inside the screen in
 /// portrait instead of clipping off both edges. `Layout` needs iOS 16 /
-/// macOS 13; below that an adaptive grid wraps the same way, with fixed
-/// column pitch instead of per-item widths, which is fine for a HUD.
-struct MetricsRow<Content: View>: View {
-    @ViewBuilder var content: () -> Content
+/// macOS 13; an adaptive grid handles 11/12 and measured stack rows handle
+/// Catalina. All three layouts receive the same complete metric list.
+struct MetricsRow: View {
+    private let content: () -> [AnyView]
+    @State private var width: CGFloat = 0
+
+    init(@MetricsContentBuilder content: @escaping () -> [AnyView]) {
+        self.content = content
+    }
 
     var body: some View {
+        let items = content()
         if #available(iOS 16, macOS 13, *) {
-            FlowLayout(hSpacing: 14, vSpacing: 8) { content() }
-        } else {
+            FlowLayout(hSpacing: 14, vSpacing: 8) {
+                ForEach(items.indices, id: \.self) { items[$0] }
+            }
+        } else if #available(iOS 14, macOS 11, *) {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 64), spacing: 14, alignment: .leading)],
-                      alignment: .leading, spacing: 8) { content() }
+                      alignment: .leading, spacing: 8) {
+                ForEach(items.indices, id: \.self) { items[$0] }
+            }
+        } else {
+            stackRows(items)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(GeometryReader { geometry in
+                    Color.clear.preference(key: MetricsWidth.self, value: geometry.size.width)
+                })
+                .onPreferenceChange(MetricsWidth.self) { width = $0 }
         }
     }
+
+    private func stackRows(_ items: [AnyView]) -> some View {
+        let columns = max(1, Int((width + 14) / 78))
+        let cellWidth = max(64, (width - CGFloat(columns - 1) * 14) / CGFloat(columns))
+        let rows = (items.count + columns - 1) / columns
+        return VStack(alignment: .leading, spacing: 8) {
+            ForEach(0..<rows, id: \.self) { row in
+                HStack(alignment: .center, spacing: 14) {
+                    ForEach((row * columns)..<min((row + 1) * columns, items.count), id: \.self) {
+                        items[$0].frame(width: cellWidth, alignment: .leading)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct MetricsWidth: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+
+/// Collect individual metrics so SwiftUI 1 can lay them out without private
+/// tuple introspection. The HUD items have no local state to erase.
+/// https://github.com/swiftlang/swift-evolution/blob/main/proposals/0289-result-builders.md
+@resultBuilder
+enum MetricsContentBuilder {
+    static func buildExpression<Content: View>(_ view: Content) -> [AnyView] { [AnyView(view)] }
+    static func buildBlock(_ items: [AnyView]...) -> [AnyView] { items.flatMap { $0 } }
+    static func buildOptional(_ items: [AnyView]?) -> [AnyView] { items ?? [] }
 }
 
 @available(iOS 16, macOS 13, *)

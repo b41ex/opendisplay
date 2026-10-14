@@ -4,7 +4,7 @@ name: Receiver Catalina diagnostic
 # separate from the supported-target Tests workflow; never mask it as green.
 on:
   push:
-    branches: [codex/receiver-catalina]
+    branches: [feature/receiver-catalina]
   workflow_dispatch:
 
 permissions:

@@ -5,7 +5,7 @@ name: Tests
 on:
   pull_request:
   push:
-    branches: [main, codex/receiver-catalina]
+    branches: [main, feature/receiver-catalina]
   workflow_dispatch:
 
 permissions:

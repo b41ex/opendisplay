@@ -1,0 +1,41 @@
+name: Receiver Catalina diagnostic
+
+# This is a real failing build until availability fixes land. Keep its result
+# separate from the supported-target Tests workflow; never mask it as green.
+on:
+  push:
+    branches: [codex/receiver-catalina]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: receiver-catalina-diagnostic-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  diagnostic:
+    name: Catalina 10.15.7 diagnostic (${{ matrix.configuration }})
+    runs-on: macos-15-intel
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: [Debug, Release]
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      CONFIGURATION: ${{ matrix.configuration }}
+      DIAGNOSTIC_TARGET: '10.15.7'
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Compile with diagnostic deployment override
+        run: bash scripts/ci/receiver-build.sh
+      - name: Preserve diagnostic logs and results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: receiver-catalina-diagnostic-${{ matrix.configuration }}-${{ github.sha }}
+          path: build/receiver-evidence/
+          if-no-files-found: error

@@ -5,7 +5,11 @@ name: Tests
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, codex/receiver-catalina]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 # A superseded run tells us nothing, so drop in-flight runs for the same ref.
 concurrency:
@@ -39,18 +43,10 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY=""
 
-      # The receiver app has a much lower deployment target than the sender
-      # (issue #241); building it is what catches an API that only exists on
-      # newer macOS sneaking into Shared/ or the receiver.
-      - name: Build macOS receiver app
+      - name: Verify Sender resolved Sparkle 2.9.6
         run: |
-          xcodebuild build \
-            -project OpenSidecar.xcodeproj \
-            -scheme OpenSidecarMacReceiver \
-            -destination 'platform=macOS' \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY=""
+          jq -e '[.pins[] | select(.identity == "sparkle") | .state.version] == ["2.9.6"]' \
+            OpenSidecar.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 
       # Shared protocol/receiver code is also compiled into the universal
       # iPhone+iPad app. Catch a mobile-only compile or asset failure on the
@@ -66,3 +62,27 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY=""
+
+  receiver:
+    name: Receiver x86_64 (${{ matrix.configuration }}, Xcode 16.4)
+    runs-on: macos-15-intel
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: [Debug, Release]
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      CONFIGURATION: ${{ matrix.configuration }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Build unsigned receiver and package ZIP
+        run: bash scripts/ci/receiver-build.sh
+      - name: Preserve receiver ZIP and build evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: receiver-x86_64-${{ matrix.configuration }}-${{ github.sha }}
+          path: build/receiver-evidence/
+          if-no-files-found: error

@@ -64,15 +64,26 @@ jobs:
             CODE_SIGN_IDENTITY=""
 
   receiver:
-    name: Receiver x86_64 (${{ matrix.configuration }}, Xcode 16.4)
+    name: Receiver ${{ matrix.label }} (${{ matrix.configuration }}, Xcode 16.4)
     runs-on: macos-15-intel
     strategy:
       fail-fast: false
       matrix:
-        configuration: [Debug, Release]
+        include:
+          - configuration: Debug
+            architectures: x86_64
+            label: x86_64
+          - configuration: Release
+            architectures: x86_64
+            label: x86_64
+          - configuration: Release
+            architectures: x86_64 arm64
+            label: universal
     env:
       DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
       CONFIGURATION: ${{ matrix.configuration }}
+      ARCHITECTURES: ${{ matrix.architectures }}
+      ARCHITECTURE_LABEL: ${{ matrix.label }}
     steps:
       - uses: actions/checkout@v6
       - name: Install XcodeGen
@@ -89,6 +100,17 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: receiver-x86_64-${{ matrix.configuration }}-${{ github.sha }}
+          name: receiver-${{ matrix.label }}-${{ matrix.configuration }}-${{ github.sha }}
           path: build/receiver-evidence/
           if-no-files-found: error
+      - name: Download the uploaded receiver artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: receiver-${{ matrix.label }}-${{ matrix.configuration }}-${{ github.sha }}
+          path: build/receiver-downloaded/
+      - name: Verify downloaded ZIP checksum, symlinks and executable bits
+        run: |
+          (cd build/receiver-downloaded && shasum -a 256 -c ../receiver-evidence/SHA256SUMS)
+          python3 scripts/ci/verify-receiver-artifact.py zip \
+            "build/receiver-downloaded/receiver-$ARCHITECTURE_LABEL-$CONFIGURATION.zip" \
+            build/receiver-evidence/bundle-manifest.json

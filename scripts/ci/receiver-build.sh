@@ -23,7 +23,7 @@ xcodegen generate
 args=(
   -project OpenSidecar.xcodeproj -scheme OpenSidecarMacReceiver
   -configuration "$CONFIGURATION" -destination 'generic/platform=macOS'
-  -derivedDataPath build/receiver ARCHS=x86_64 ONLY_ACTIVE_ARCH=NO
+  -derivedDataPath build/receiver "ARCHS=${ARCHITECTURES:-x86_64}" ONLY_ACTIVE_ARCH=NO
   CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO 'CODE_SIGN_IDENTITY='
 )
 if [[ -n "${DIAGNOSTIC_TARGET:-}" ]]; then
@@ -54,7 +54,7 @@ test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/In
 printf 'bundle_id=%s\nminimum_os=%s\n' "$bundle_id" \
   "$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$app/Contents/Info.plist")" >> "$evidence/manifest.txt"
 test "$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$app/Contents/Info.plist")" = 10.15.7
-test "$(lipo -archs "$app/Contents/MacOS/$product")" = x86_64
+python3 scripts/ci/verify-receiver-artifact.py bundle "$app" "$evidence/bundle-manifest.json"
 # Record every embedded Mach-O (Sparkle helpers and Swift runtime included).
 while IFS= read -r -d '' binary; do
   if file -b "$binary" | grep -q 'Mach-O'; then
@@ -66,6 +66,7 @@ done < <(find "$app" -type f -print0) > "$evidence/macho-manifest.txt"
 
 # ZIP the app on macOS before artifact upload to preserve modes and symlinks.
 # https://docs.github.com/en/actions/tutorials/store-and-share-data
-zip_path="$evidence/receiver-x86_64-$CONFIGURATION.zip"
+zip_path="$evidence/receiver-${ARCHITECTURE_LABEL:-x86_64}-$CONFIGURATION.zip"
 ditto -c -k --sequesterRsrc --keepParent "$app" "$zip_path"
 (cd "$evidence" && shasum -a 256 "$(basename "$zip_path")" > SHA256SUMS)
+python3 scripts/ci/verify-receiver-artifact.py zip "$zip_path" "$evidence/bundle-manifest.json"

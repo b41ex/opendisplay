@@ -77,6 +77,12 @@ jobs:
       - uses: actions/checkout@v6
       - name: Install XcodeGen
         run: brew install xcodegen
+      - name: Check preference model availability on Catalina
+        run: |
+          xcrun swiftc -typecheck -swift-version 5 \
+            -target x86_64-apple-macosx10.15.7 \
+            -sdk "$(xcrun --sdk macosx --show-sdk-path)" \
+            MacReceiver/ReceiverPreferences.swift
       - name: Build unsigned receiver and package ZIP
         run: bash scripts/ci/receiver-build.sh
       - name: Preserve receiver ZIP and build evidence

@@ -48,6 +48,9 @@ jobs:
           jq -e '[.pins[] | select(.identity == "sparkle") | .state.version] == ["2.9.6"]' \
             OpenSidecar.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 
+      - name: Verify empty-name regression test detects an inverted fallback
+        run: bash scripts/ci/check-receiver-preference-tests.sh
+
       # Shared protocol/receiver code is also compiled into the universal
       # iPhone+iPad app. Catch a mobile-only compile or asset failure on the
       # change that introduced it, before release-please creates a tag and the

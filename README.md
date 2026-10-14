@@ -347,6 +347,60 @@ For a Mac that should *be* the display, grab `OpenDisplayReceiver.dmg` from
 the same release instead. It runs on macOS 12+ and is signed and notarized
 the same way; both apps update themselves via Sparkle.
 
+### Experimental Catalina Receiver CI builds
+
+The `feature/receiver-catalina` branch builds an **unsigned** Receiver for
+macOS **10.15.7+ on Intel**, with a universal Release that keeps **macOS 11+
+on Apple silicon**. The public signed/notarized DMG described above still
+requires macOS 12+. These CI builds are for compatibility testing; the port
+has not yet been validated on the target Late 2013 iMac / GTX 780M.
+
+Receiver compilation and artifact inspection run on GitHub `macos-15-intel`
+with explicitly selected Xcode 16.4. Sender tests and the iOS build use a
+modern runner. Sparkle is pinned to 2.9.6. Receiver CI builds use
+`CODE_SIGNING_ALLOWED=NO`, `CODE_SIGNING_REQUIRED=NO`, and an empty signing
+identity; no local or target-iMac compilation is needed for this test path.
+
+Open a successful [Tests run](https://github.com/b41ex/opendisplay/actions/workflows/tests.yml)
+for `feature/receiver-catalina`
+and select the artifact for its exact commit SHA:
+
+- `receiver-x86_64-Debug-SHA` — `OpenDisplay Receiver Dev.app`, for the first test session.
+- `receiver-x86_64-Release-SHA` — unsigned Intel Release.
+- `receiver-universal-Release-SHA` — unsigned x86_64 + arm64 Release.
+
+Each artifact contains an inner app ZIP, `SHA256SUMS`, build logs, resolved
+dependencies and manifests. CI checks the macOS minimum of every embedded
+Mach-O slice, then uploads/downloads and restores the ZIP to verify file
+hashes, symlinks and executable permission bits. A green build confirms
+these checks; it does not confirm Catalina runtime or performance.
+
+For example, download the Debug artifact using its run ID and full SHA:
+
+```sh
+gh run download RUN_ID --repo b41ex/opendisplay \
+  --name receiver-x86_64-Debug-SHA --dir receiver-ci
+cd receiver-ci
+shasum -a 256 -c SHA256SUMS
+mkdir -p "$HOME/Applications"
+ditto -x -k receiver-x86_64-Debug.zip "$HOME/Applications"
+open "$HOME/Applications/OpenDisplay Receiver Dev.app"
+```
+
+Quit the previous Dev app before replacing that test copy. Keep its bundle
+ID `com.peetzweg.opensidecar.mac.receiver.debug`; do not re-sign it or replace
+the installed release Receiver. Extract unsigned Release into a separate
+test directory. If quarantine blocks a test copy, record the exact macOS
+message and the launch authorization used for that copy. Production Sparkle
+update installation, Developer ID signing and notarization are separate work.
+
+Before a target session, confirm the machine's model, OS, GPU and screen
+geometry; an SSH alias alone does not identify it. H.264 at 2560×1440, scale
+1× and stable 30 fps is the required baseline. Both that baseline and 60 fps
+still need measurements on the target iMac, including fullscreen, sustained
+animation, idle, reconnect and sleep/wake. Keep the Sender's development
+identity stable and launch it with `./run.sh` as specified in [AGENTS.md](AGENTS.md).
+
 ### iPhone app
 
 Needs **iOS / iPadOS 15 or newer**. That reaches the 16.7.x line (iPad 5,
